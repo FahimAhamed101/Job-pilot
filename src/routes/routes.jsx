@@ -29,14 +29,17 @@ import Job from "../page/Job/Job";
 import ForgotPassword from "../page/Auth/ForgetPassword/ForgetPassword";
 import Settings from "../component/Main/Settings/Settings";
 import RecrutiterTable from "../page/Admin/RecrutiterTable";
+
+
+
 const router = createBrowserRouter([
   {
     path: "/",
     element: (
-      // <AdminRoutes>
-        
-      // </AdminRoutes>
-      <MainLayout />
+    <AdminRoutes>
+         <MainLayout />
+    </AdminRoutes>
+     
     ),
    
     errorElement: <h1>Error</h1>,
