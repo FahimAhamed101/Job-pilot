@@ -7,7 +7,7 @@ const AdminRoutes = ({ children }) => {
   const { user } = useSelector((state) => state.auth);
   const isAdmin = user && (user.role === "admin" ||  user.role === "superAdmin");
   if (!isAdmin) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth/login" replace />;
   }
 
   // If admin, render the requested admin route component

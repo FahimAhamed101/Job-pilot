@@ -118,7 +118,7 @@ const router = createBrowserRouter([
     errorElement: <h1>Auth Error</h1>,
     children: [
       {
-        index: true,
+         path: "login",
         element: <SignIn />,
       },
  {

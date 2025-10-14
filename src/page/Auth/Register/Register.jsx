@@ -85,7 +85,7 @@ const Register = () => {
         
         // Redirect to login page after a delay
         setTimeout(() => {
-          navigate("/auth");
+          navigate("/auth/login");
         }, 3000);
         return;
       }
