@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 // Create base query with better error handling
 const baseQuery = fetchBaseQuery({
-  baseUrl: "https://ethical-opponent-citysearch-recordings.trycloudflare.com/api/v1",
+  baseUrl: "http://localhost:5000/api/v1",
   prepareHeaders: (headers, { getState }) => {
     // Try to get token from Redux store first
     const token = getState().auth?.token;

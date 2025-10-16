@@ -143,10 +143,10 @@ const userApi = baseApi.injectEndpoints({
       ],
     }),
 
-    // Delete user
+    // Delete user - FIXED: Changed endpoint to match backend
     deleteUser: builder.mutation({
       query: (id) => ({
-        url: `/user/${id}`,
+        url: `/user/delete/${id}`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Users'],

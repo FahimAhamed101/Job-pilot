@@ -8,6 +8,7 @@ import {
   useDeleteUserMutation,
   useToggleBlockUserMutation 
 } from '../../../redux/features/user/userApi';
+import { useSelector } from 'react-redux';
 
 const Users = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -15,6 +16,10 @@ const Users = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+
+  // Get current user from Redux store
+  const { user: currentUser } = useSelector((state) => state.auth);
+  const isAnalyst = currentUser?.role === 'analyst';
 
   // API calls
   const { 
@@ -31,7 +36,7 @@ const Users = () => {
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
-  const [deleteUser] = useDeleteUserMutation();
+  const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
   const [toggleBlockUser] = useToggleBlockUserMutation();
 
   // Modal states
@@ -52,7 +57,7 @@ const Users = () => {
     Designation: '',
     address: '',
     profileImage: null,
-    profileImagePreview: null, // Add preview URL
+    profileImagePreview: null,
     CV: null,
   });
 
@@ -64,7 +69,7 @@ const Users = () => {
     Designation: '',
     address: '',
     profileImage: null,
-    profileImagePreview: null, // Add preview URL
+    profileImagePreview: null,
     CV: null,
   });
 
@@ -105,6 +110,8 @@ const Users = () => {
 
   // Handle Add New User
   const showAddModal = () => {
+    if (isAnalyst) return; // Prevent analysts from adding
+    
     setIsAddModalVisible(true);
   };
 
@@ -119,6 +126,12 @@ const Users = () => {
       // Validate password match
       if (newUser.password !== newUser.ConfirmPassword) {
         message.error('Passwords do not match');
+        return;
+      }
+
+      // Validate password length
+      if (newUser.password.length < 6) {
+        message.error('Password must be at least 6 characters long');
         return;
       }
 
@@ -183,6 +196,8 @@ const Users = () => {
 
   // Handle Edit User
   const showEditModal = (user) => {
+    if (isAnalyst) return; // Prevent analysts from editing
+    
     setEditUser({
       firstName: user.originalData.firstName,
       lastName: user.originalData.lastName || '',
@@ -191,7 +206,7 @@ const Users = () => {
       Designation: user.originalData.Designation || '',
       address: user.originalData.address || '',
       profileImage: user.originalData.profileImage,
-      profileImagePreview: user.originalData.profileImage, // Set preview from existing image
+      profileImagePreview: user.originalData.profileImage,
       CV: user.originalData.CV,
     });
     setSelectedUser(user);
@@ -245,6 +260,8 @@ const Users = () => {
 
   // Handle Delete User
   const showDeleteConfirm = (user) => {
+    if (isAnalyst) return; // Prevent analysts from deleting
+    
     setSelectedUser(user);
     setIsDeleteModalVisible(true);
   };
@@ -254,17 +271,25 @@ const Users = () => {
       await deleteUser(selectedUser.originalData._id).unwrap();
       message.success('User deleted successfully!');
       setIsDeleteModalVisible(false);
+      setSelectedUser(null);
     } catch (error) {
-      message.error('Failed to delete user: ' + (error.data?.message || 'Unknown error'));
+      console.error('Delete error:', error);
+      message.error('Failed to delete user: ' + (error.data?.message || error.message || 'Unknown error'));
     }
   };
 
   const handleDeleteCancel = () => {
     setIsDeleteModalVisible(false);
+    setSelectedUser(null);
   };
 
   // Handle Block/Unblock User
   const handleToggleBlock = async (user) => {
+    if (isAnalyst) {
+      message.warning('Analysts cannot block/unblock users');
+      return;
+    }
+    
     try {
       await toggleBlockUser({
         id: user.originalData._id,
@@ -286,7 +311,16 @@ const Users = () => {
     }
   };
 
-  // Fixed file upload handlers with preview
+  // Handle select changes
+  const handleSelectChange = (value, field, modalType) => {
+    if (modalType === 'edit') {
+      setEditUser(prev => ({ ...prev, [field]: value }));
+    } else {
+      setNewUser(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  // File upload handlers with preview
   const handleProfileUpload = (file, modalType) => {
     // Validate file type
     const isImage = file.type.startsWith('image/');
@@ -319,6 +353,7 @@ const Users = () => {
       }));
     }
 
+    message.success(`${file.name} file selected successfully`);
     return false; // Prevent automatic upload
   };
 
@@ -361,7 +396,7 @@ const Users = () => {
     };
   }, [newUser.profileImagePreview, editUser.profileImagePreview]);
 
-  // Define columns (same as before)
+  // Define columns
   const columns = [
     {
       title: 'ID',
@@ -441,6 +476,7 @@ const Users = () => {
       key: 'action',
       render: (_, record) => (
         <Space size="small">
+          {/* Always show View button */}
           <Button
             type="link"
             icon={<EyeOutlined />}
@@ -448,28 +484,36 @@ const Users = () => {
             className="text-blue-500"
             title="View"
           />
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => showEditModal(record)}
-            className="text-green-500"
-            title="Edit"
-          />
-          <Button
-            type="link"
-            icon={<DeleteOutlined />}
-            onClick={() => showDeleteConfirm(record)}
-            className="text-red-500"
-            title="Delete"
-          />
-          <Button
-            type="link"
-            onClick={() => handleToggleBlock(record)}
-            className={record.originalData.isBlocked ? 'text-green-500' : 'text-orange-500'}
-            title={record.originalData.isBlocked ? 'Unblock' : 'Block'}
-          >
-            {record.originalData.isBlocked ? '🔓' : '🔒'}
-          </Button>
+          
+          {/* Show Edit, Delete, and Block buttons only for non-analysts */}
+          {!isAnalyst && (
+            <>
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => showEditModal(record)}
+                className="text-green-500"
+                title="Edit"
+                disabled={isUpdating}
+              />
+              <Button
+                type="link"
+                icon={<DeleteOutlined />}
+                onClick={() => showDeleteConfirm(record)}
+                className="text-red-500"
+                title="Delete"
+                disabled={isDeleting}
+              />
+              <Button
+                type="link"
+                onClick={() => handleToggleBlock(record)}
+                className={record.originalData.isBlocked ? 'text-green-500' : 'text-orange-500'}
+                title={record.originalData.isBlocked ? 'Unblock' : 'Block'}
+              >
+                {record.originalData.isBlocked ? '🔓' : '🔒'}
+              </Button>
+            </>
+          )}
         </Space>
       ),
     },
@@ -542,15 +586,19 @@ const Users = () => {
               Status <DownOutlined />
             </Button>
           </Dropdown>
-          <Button
-            type="primary"
-            icon={<span className="text-white">+</span>}
-            className="bg-gradient-to-r from-[#059E68] to-[#C9F31D] text-white rounded flex items-center"
-            onClick={showAddModal}
-            loading={isCreating}
-          >
-            Add New User
-          </Button>
+          
+          {/* Show Add button only for non-analysts */}
+          {!isAnalyst && (
+            <Button
+              type="primary"
+              icon={<span className="text-white">+</span>}
+              className="bg-gradient-to-r from-[#059E68] to-[#C9F31D] text-white rounded flex items-center"
+              onClick={showAddModal}
+              loading={isCreating}
+            >
+              Add New User
+            </Button>
+          )}
         </div>
       </div>
 
@@ -563,13 +611,13 @@ const Users = () => {
             current: currentPage,
             pageSize: pageSize,
             total: totalUsers,
+            onChange: handlePageChange,
+            onShowSizeChange: handlePageChange,
             showSizeChanger: true,
             showQuickJumper: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total, range) => 
               `Showing ${range[0]}-${range[1]} of ${total} users`,
-            onChange: handlePageChange,
-            onShowSizeChange: handlePageChange,
           }}
           scroll={{ x: 800 }}
         />
@@ -583,6 +631,8 @@ const Users = () => {
         onCancel={handleAddCancel}
         confirmLoading={isCreating}
         width={600}
+        okText="Create User"
+        cancelText="Cancel"
       >
         <div className="space-y-4 p-4">
           <Upload
@@ -613,7 +663,6 @@ const Users = () => {
             </div>
           </Upload>
 
-          {/* Rest of the form remains the same */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
@@ -672,7 +721,7 @@ const Users = () => {
               <select
                 name="role"
                 value={newUser.role}
-                onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value }))}
+                onChange={(e) => handleSelectChange(e.target.value, 'role', 'add')}
                 className="w-full border border-gray-300 rounded px-3 py-2"
               >
                 <option value="user">User</option>
@@ -737,6 +786,8 @@ const Users = () => {
         onCancel={handleEditCancel}
         confirmLoading={isUpdating}
         width={600}
+        okText="Update User"
+        cancelText="Cancel"
       >
         <div className="space-y-4 p-4">
           <Upload
@@ -773,7 +824,6 @@ const Users = () => {
             </div>
           </Upload>
 
-          {/* Rest of the edit form remains the same */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
@@ -861,10 +911,17 @@ const Users = () => {
         onOk={handleDeleteOk}
         onCancel={handleDeleteCancel}
         okText="Delete"
-        okType="danger"
+        cancelText="Cancel"
+        confirmLoading={isDeleting}
+        okButtonProps={{ danger: true }}
       >
-        <p>Are you sure you want to delete user <strong>{selectedUser?.name}</strong>?</p>
-        <p className="text-red-500 text-sm mt-2">This action cannot be undone.</p>
+        <div className="flex items-start">
+          <span className="text-red-500 mr-3 text-xl">🗑️</span>
+          <div>
+            <h3 className="font-semibold mb-2">Delete this user</h3>
+            <p>Are you sure you want to delete <strong>{selectedUser?.name}</strong>? This action cannot be undone.</p>
+          </div>
+        </div>
       </Modal>
 
       {/* View User Modal */}
@@ -892,7 +949,7 @@ const Users = () => {
               />
               <h3 className="text-lg font-semibold">{selectedUser.name}</h3>
               <p className="text-gray-600">{selectedUser.designation || 'No designation'}</p>
-              <Tag color={selectedUser.role === 'admin' ? 'red' : 'blue'} className="mt-1">
+              <Tag color={selectedUser.role === 'admin' ? 'red' : selectedUser.role === 'super_admin' ? 'purple' : 'blue'} className="mt-1">
                 {selectedUser.role.toUpperCase()}
               </Tag>
             </div>

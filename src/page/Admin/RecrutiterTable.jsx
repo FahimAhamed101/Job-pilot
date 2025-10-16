@@ -1,22 +1,47 @@
 import React, { useState } from 'react';
-import { Table, Modal, Button, Input, message, Image } from 'antd';
+import { Table, Modal, Button, Input, message, Image, Form, Upload, Select } from 'antd';
 import { 
   useGetAllUsersQuery, 
   useUpdateUserMutation, 
-  useDeleteUserMutation 
+  useDeleteUserMutation,
+  useCreateUserMutation 
 } from '../../redux/features/user/userApi';
+import { UserOutlined, UploadOutlined } from '@ant-design/icons';
+import { useSelector } from 'react-redux';
+
+const { Option } = Select;
 
 const RecrutiterTable = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Get current user from Redux store
+  const { user: currentUser } = useSelector((state) => state.auth);
+  const isAnalyst = currentUser?.role === 'analyst';
+
   // Modal states
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-  const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [selectedRecruiter, setSelectedRecruiter] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  const [newUser, setNewUser] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    password: '',
+    ConfirmPassword: '',
+    role: 'recruiter',
+    Designation: '',
+    address: '',
+    profileImage: null,
+  });
+
+  // Define base URL - use environment variable or fallback to localhost
+  const BASE_URL = import.meta.env.REACT_APP_BASE_URL || 'http://localhost:5000';
 
   // API hooks
   const { 
@@ -33,6 +58,7 @@ const RecrutiterTable = () => {
 
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
   const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
+  const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
 
   // Extract users and pagination info from API response
   const users = usersData?.users || [];
@@ -53,7 +79,7 @@ const RecrutiterTable = () => {
         <div className="flex items-center">
           {record.profileImage ? (
             <Image 
-              src={`${process.env.REACT_APP_BASE_URL}${record.profileImage}`}
+              src={`${BASE_URL}${record.profileImage}`}
               alt={text}
               width={40}
               height={40}
@@ -82,6 +108,12 @@ const RecrutiterTable = () => {
       dataIndex: 'phoneNumber',
       key: 'phone',
       render: (phone) => phone || 'N/A',
+    },
+    {
+      title: 'Designation',
+      dataIndex: 'Designation',
+      key: 'designation',
+      render: (designation) => designation || 'N/A',
     },
     {
       title: 'Status',
@@ -118,14 +150,7 @@ const RecrutiterTable = () => {
       width: 200,
       render: (text, record) => (
         <div className="flex space-x-2">
-          <Button
-            size="small"
-            className="bg-blue-100 text-blue-600 border-blue-200"
-            onClick={() => showEditModal(record)}
-            loading={isUpdating}
-          >
-            Edit
-          </Button>
+          {/* Always show View button */}
           <Button
             size="small"
             className="bg-gray-100 text-gray-600 border-gray-200"
@@ -133,14 +158,28 @@ const RecrutiterTable = () => {
           >
             View
           </Button>
-          <Button
-            size="small"
-            danger
-            onClick={() => showDeleteModal(record)}
-            loading={isDeleting}
-          >
-            Delete
-          </Button>
+          
+          {/* Show Edit and Delete buttons only for non-analysts */}
+          {!isAnalyst && (
+            <>
+              <Button
+                size="small"
+                className="bg-blue-100 text-blue-600 border-blue-200"
+                onClick={() => showEditModal(record)}
+                loading={isUpdating}
+              >
+                Edit
+              </Button>
+              <Button
+                size="small"
+                danger
+                onClick={() => showDeleteModal(record)}
+                loading={isDeleting}
+              >
+                Delete
+              </Button>
+            </>
+          )}
         </div>
       ),
     },
@@ -148,28 +187,39 @@ const RecrutiterTable = () => {
 
   // Modal handlers
   const showViewModal = (record) => {
-    setSelectedAdmin(record);
+    setSelectedRecruiter(record);
     setIsModalVisible(true);
   };
 
   const showEditModal = (record) => {
+    if (isAnalyst) return; // Prevent analysts from editing
+    
     setEditForm({ 
       ...record,
       firstName: record.firstName || '',
       email: record.email || '',
       phoneNumber: record.phoneNumber || '',
+      Designation: record.Designation || '',
     });
     setIsEditModalVisible(true);
   };
 
   const showDeleteModal = (record) => {
-    setSelectedAdmin(record);
+    if (isAnalyst) return; // Prevent analysts from deleting
+    
+    setSelectedRecruiter(record);
     setIsDeleteModalVisible(true);
+  };
+
+  const showAddModal = () => {
+    if (isAnalyst) return; // Prevent analysts from adding
+    
+    setIsAddModalVisible(true);
   };
 
   const handleCancel = () => {
     setIsModalVisible(false);
-    setSelectedAdmin(null);
+    setSelectedRecruiter(null);
   };
 
   const handleEditCancel = () => {
@@ -179,7 +229,23 @@ const RecrutiterTable = () => {
 
   const handleDeleteCancel = () => {
     setIsDeleteModalVisible(false);
-    setSelectedAdmin(null);
+    setSelectedRecruiter(null);
+  };
+
+  const handleAddCancel = () => {
+    setIsAddModalVisible(false);
+    setNewUser({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
+      password: '',
+      ConfirmPassword: '',
+      role: 'recruiter',
+      Designation: '',
+      address: '',
+      profileImage: null,
+    });
   };
 
   // API action handlers
@@ -195,34 +261,88 @@ const RecrutiterTable = () => {
         firstName: editForm.firstName,
         email: editForm.email,
         phoneNumber: editForm.phoneNumber,
+        Designation: editForm.Designation,
       }).unwrap();
 
-      message.success('User updated successfully');
+      message.success('Recruiter updated successfully');
       setIsEditModalVisible(false);
       setEditForm(null);
       refetch();
     } catch (error) {
-      console.error('Failed to update user:', error);
-      message.error('Failed to update user');
+      console.error('Failed to update recruiter:', error);
+      message.error('Failed to update recruiter');
     }
   };
 
   const handleDeleteOk = async () => {
     try {
-      if (!selectedAdmin?._id) {
+      if (!selectedRecruiter?._id) {
         message.error('User ID is required');
         return;
       }
 
-      await deleteUser(selectedAdmin._id).unwrap();
+      await deleteUser(selectedRecruiter._id).unwrap();
       
-      message.success('User deleted successfully');
+      message.success('Recruiter deleted successfully');
       setIsDeleteModalVisible(false);
-      setSelectedAdmin(null);
+      setSelectedRecruiter(null);
       refetch();
     } catch (error) {
-      console.error('Failed to delete user:', error);
-      message.error('Failed to delete user');
+      console.error('Failed to delete recruiter:', error);
+      message.error('Failed to delete recruiter');
+    }
+  };
+
+  const handleAddOk = async () => {
+    try {
+      // Validate required fields
+      if (!newUser.firstName || !newUser.email || !newUser.phoneNumber || !newUser.password) {
+        message.error('Please fill all required fields');
+        return;
+      }
+
+      if (newUser.password !== newUser.ConfirmPassword) {
+        message.error('Passwords do not match');
+        return;
+      }
+
+      if (newUser.password.length < 6) {
+        message.error('Password must be at least 6 characters long');
+        return;
+      }
+
+      const userData = {
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        phoneNumber: newUser.phoneNumber,
+        password: newUser.password,
+        ConfirmPassword: newUser.ConfirmPassword,
+        role: 'recruiter',
+        Designation: newUser.Designation,
+        address: newUser.address,
+        profileImage: newUser.profileImage,
+      };
+
+      await createUser(userData).unwrap();
+      message.success('Recruiter created successfully!');
+      setIsAddModalVisible(false);
+      setNewUser({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        password: '',
+        ConfirmPassword: '',
+        role: 'recruiter',
+        Designation: '',
+        address: '',
+        profileImage: null,
+      });
+      refetch();
+    } catch (error) {
+      console.error('Create recruiter error:', error);
+      message.error('Failed to create recruiter: ' + (error.data?.message || error.message || 'Unknown error'));
     }
   };
 
@@ -233,20 +353,48 @@ const RecrutiterTable = () => {
     }));
   };
 
+  const handleNewUserChange = (field, value) => {
+    setNewUser(prev => ({ 
+      ...prev, 
+      [field]: value 
+    }));
+  };
+
+  const handleProfileUpload = (file) => {
+    const isImage = file.type.startsWith('image/');
+    if (!isImage) {
+      message.error('You can only upload image files!');
+      return false;
+    }
+
+    const isLt2M = file.size / 1024 / 1024 < 2;
+    if (!isLt2M) {
+      message.error('Image must be smaller than 2MB!');
+      return false;
+    }
+
+    setNewUser(prev => ({ 
+      ...prev, 
+      profileImage: file 
+    }));
+    message.success(`${file.name} file selected successfully`);
+    return false;
+  };
+
   const handlePageChange = (page) => {
     setCurrentPage(page);
   };
 
   const handleSearch = (value) => {
     setSearchTerm(value);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
   };
 
   if (error) {
     return (
       <div className="container mx-auto p-4">
         <div className="text-red-500 text-center">
-          Error loading users: {error?.data?.message || 'Something went wrong'}
+          Error loading recruiters: {error?.data?.message || 'Something went wrong'}
         </div>
       </div>
     );
@@ -255,14 +403,28 @@ const RecrutiterTable = () => {
   return (
     <div className="container mx-auto p-4 min-h-screen">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Recrutiter</h2>
-        <Input.Search
-          placeholder="Search admins..."
-          style={{ width: 300 }}
-          onSearch={handleSearch}
-          onChange={(e) => !e.target.value && setSearchTerm('')}
-          allowClear
-        />
+        <h2 className="text-2xl font-bold">Recruiter Management</h2>
+        <div className="flex space-x-2">
+          <Input.Search
+            placeholder="Search recruiters..."
+            style={{ width: 300 }}
+            onSearch={handleSearch}
+            onChange={(e) => !e.target.value && setSearchTerm('')}
+            allowClear
+          />
+          
+          {/* Show Add button only for non-analysts */}
+          {!isAnalyst && (
+            <Button
+              type="primary"
+              className="bg-gradient-to-r from-green-600 to-lime-400 text-white border-none"
+              onClick={showAddModal}
+              loading={isCreating}
+            >
+              Add New Recruiter
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="overflow-x-auto bg-white shadow-md rounded-lg">
@@ -289,7 +451,7 @@ const RecrutiterTable = () => {
             },
             showTotal: (total, range) => (
               <div className="text-gray-600">
-                Total Admins: {total} & Pages: {currentPage}/{Math.ceil(total / pageSize)}
+                Total Recruiters: {total} & Pages: {currentPage}/{Math.ceil(total / pageSize)}
               </div>
             ),
           }}
@@ -307,7 +469,7 @@ const RecrutiterTable = () => {
 
       {/* View Modal */}
       <Modal
-        title="Admin Profile"
+        title="Recruiter Profile"
         open={isModalVisible}
         onCancel={handleCancel}
         footer={[
@@ -318,13 +480,13 @@ const RecrutiterTable = () => {
         className="custom-modal"
         width={400}
       >
-        {selectedAdmin && (
+        {selectedRecruiter && (
           <div className="p-4">
             <div className="flex justify-center mb-4">
-              {selectedAdmin.profileImage ? (
+              {selectedRecruiter.profileImage ? (
                 <Image
-                  src={`${process.env.REACT_APP_BASE_URL}${selectedAdmin.profileImage}`}
-                  alt={selectedAdmin.firstName}
+                  src={`${BASE_URL}${selectedRecruiter.profileImage}`}
+                  alt={selectedRecruiter.firstName}
                   width={80}
                   height={80}
                   className="rounded-full object-cover"
@@ -333,22 +495,23 @@ const RecrutiterTable = () => {
               ) : (
                 <div className="w-20 h-20 rounded-full bg-gray-300 flex items-center justify-center">
                   <span className="text-gray-600 text-xl">
-                    {selectedAdmin.firstName?.charAt(0)?.toUpperCase() || 'U'}
+                    {selectedRecruiter.firstName?.charAt(0)?.toUpperCase() || 'U'}
                   </span>
                 </div>
               )}
             </div>
             <div className="space-y-2 text-center">
-              <p><strong>Name:</strong> {selectedAdmin.firstName || 'N/A'}</p>
-              <p><strong>ID:</strong> {selectedAdmin.userId || 'N/A'}</p>
-              <p><strong>Email:</strong> {selectedAdmin.email || 'N/A'}</p>
-              <p><strong>Phone:</strong> {selectedAdmin.phoneNumber || 'N/A'}</p>
+              <p><strong>Name:</strong> {selectedRecruiter.firstName || 'N/A'} {selectedRecruiter.lastName || ''}</p>
+              <p><strong>ID:</strong> {selectedRecruiter.userId || 'N/A'}</p>
+              <p><strong>Email:</strong> {selectedRecruiter.email || 'N/A'}</p>
+              <p><strong>Phone:</strong> {selectedRecruiter.phoneNumber || 'N/A'}</p>
+              <p><strong>Designation:</strong> {selectedRecruiter.Designation || 'N/A'}</p>
               <p><strong>Status:</strong> 
-                <span className={`ml-1 ${selectedAdmin.status === 'Active' ? 'text-green-600' : 'text-red-600'}`}>
-                  {selectedAdmin.status || 'Inactive'}
+                <span className={`ml-1 ${selectedRecruiter.status === 'Active' ? 'text-green-600' : 'text-red-600'}`}>
+                  {selectedRecruiter.status || 'Inactive'}
                 </span>
               </p>
-              <p><strong>Joined:</strong> {new Date(selectedAdmin.createdAt).toLocaleDateString()}</p>
+              <p><strong>Joined:</strong> {new Date(selectedRecruiter.createdAt).toLocaleDateString()}</p>
             </div>
           </div>
         )}
@@ -356,7 +519,7 @@ const RecrutiterTable = () => {
 
       {/* Edit Modal */}
       <Modal
-        title="Edit Admin"
+        title="Edit Recruiter"
         open={isEditModalVisible}
         onOk={handleEditOk}
         onCancel={handleEditCancel}
@@ -368,7 +531,7 @@ const RecrutiterTable = () => {
         {editForm && (
           <div className="p-4 space-y-4">
             <div>
-              <label className="block mb-1 font-medium">Name</label>
+              <label className="block mb-1 font-medium">Name *</label>
               <Input
                 value={editForm.firstName}
                 onChange={(e) => handleEditChange('firstName', e.target.value)}
@@ -376,7 +539,7 @@ const RecrutiterTable = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 font-medium">Email</label>
+              <label className="block mb-1 font-medium">Email *</label>
               <Input
                 value={editForm.email}
                 onChange={(e) => handleEditChange('email', e.target.value)}
@@ -384,20 +547,129 @@ const RecrutiterTable = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 font-medium">Phone</label>
+              <label className="block mb-1 font-medium">Phone *</label>
               <Input
                 value={editForm.phoneNumber}
                 onChange={(e) => handleEditChange('phoneNumber', e.target.value)}
                 placeholder="Enter phone number"
               />
             </div>
+            <div>
+              <label className="block mb-1 font-medium">Designation</label>
+              <Input
+                value={editForm.Designation}
+                onChange={(e) => handleEditChange('Designation', e.target.value)}
+                placeholder="Enter designation"
+              />
+            </div>
           </div>
         )}
       </Modal>
 
+      {/* Add Recruiter Modal */}
+      <Modal
+        title="Add New Recruiter"
+        open={isAddModalVisible}
+        onOk={handleAddOk}
+        onCancel={handleAddCancel}
+        confirmLoading={isCreating}
+        width={500}
+      >
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="block mb-1 font-medium">Profile Image</label>
+            <Upload
+              beforeUpload={handleProfileUpload}
+              showUploadList={false}
+              accept="image/*"
+            >
+              <Button icon={<UploadOutlined />}>
+                {newUser.profileImage ? `✓ ${newUser.profileImage.name}` : 'Upload Profile Image'}
+              </Button>
+            </Upload>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block mb-1 font-medium">First Name *</label>
+              <Input
+                value={newUser.firstName}
+                onChange={(e) => handleNewUserChange('firstName', e.target.value)}
+                placeholder="First name"
+              />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Last Name</label>
+              <Input
+                value={newUser.lastName}
+                onChange={(e) => handleNewUserChange('lastName', e.target.value)}
+                placeholder="Last name"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Email *</label>
+            <Input
+              type="email"
+              value={newUser.email}
+              onChange={(e) => handleNewUserChange('email', e.target.value)}
+              placeholder="email@example.com"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Phone Number *</label>
+            <Input
+              value={newUser.phoneNumber}
+              onChange={(e) => handleNewUserChange('phoneNumber', e.target.value)}
+              placeholder="+1-234-567-8900"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Designation</label>
+            <Input
+              value={newUser.Designation}
+              onChange={(e) => handleNewUserChange('Designation', e.target.value)}
+              placeholder="Recruitment Specialist"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Address</label>
+            <Input.TextArea
+              value={newUser.address}
+              onChange={(e) => handleNewUserChange('address', e.target.value)}
+              placeholder="Enter address"
+              rows={2}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block mb-1 font-medium">Password *</label>
+              <Input.Password
+                value={newUser.password}
+                onChange={(e) => handleNewUserChange('password', e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Confirm Password *</label>
+              <Input.Password
+                value={newUser.ConfirmPassword}
+                onChange={(e) => handleNewUserChange('ConfirmPassword', e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+        </div>
+      </Modal>
+
       {/* Delete Modal */}
       <Modal
-        title="Delete Admin"
+        title="Delete Recruiter"
         open={isDeleteModalVisible}
         onOk={handleDeleteOk}
         onCancel={handleDeleteCancel}
@@ -409,8 +681,8 @@ const RecrutiterTable = () => {
         <div className="flex items-start">
           <span className="text-red-500 mr-3 text-xl">🗑️</span>
           <div>
-            <h3 className="font-semibold mb-2">Delete this admin</h3>
-            <p>Are you sure you want to delete {selectedAdmin?.firstName}? This action cannot be undone.</p>
+            <h3 className="font-semibold mb-2">Delete this recruiter</h3>
+            <p>Are you sure you want to delete {selectedRecruiter?.firstName}? This action cannot be undone.</p>
           </div>
         </div>
       </Modal>

@@ -19,7 +19,35 @@ const libraryApi = baseApi.injectEndpoints({
       providesTags: ['Library'],
     }),
 
-    // Delete library item (keep this as it doesn't involve file upload)
+    // Add library item with file upload
+    addLibraryItem: builder.mutation({
+      query: (formData) => ({
+        url: '/library/create',
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type header - let browser set it automatically for FormData
+        headers: {
+          // Remove 'Content-Type' to let browser set it with boundary
+        },
+      }),
+      invalidatesTags: ['Library'],
+    }),
+
+    // Update library item with file upload
+    updateLibraryItem: builder.mutation({
+      query: ({ id, formData }) => ({
+        url: `/library/update/${id}`,
+        method: 'PUT',
+        body: formData,
+        // Don't set Content-Type header - let browser set it automatically for FormData
+        headers: {
+          // Remove 'Content-Type' to let browser set it with boundary
+        },
+      }),
+      invalidatesTags: ['Library'],
+    }),
+
+    // Delete library item
     deleteLibraryItem: builder.mutation({
       query: (id) => ({
         url: `/library/delete/${id}`,
@@ -27,14 +55,12 @@ const libraryApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ['Library'],
     }),
-
-    // REMOVED: addLibraryItem and updateLibraryItem mutations
-    // We'll use custom functions for file uploads instead
   }),
 });
 
 export const {
   useGetAllLibraryItemsQuery,
   useDeleteLibraryItemMutation,
-  // REMOVED: useAddLibraryItemMutation, useUpdateLibraryItemMutation
+  useAddLibraryItemMutation,
+  useUpdateLibraryItemMutation
 } = libraryApi;

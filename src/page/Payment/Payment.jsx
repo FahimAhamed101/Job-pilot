@@ -9,6 +9,7 @@ import {
   useUpdatePaymentMutation, 
   useDeletePaymentMutation 
 } from '../../redux/features/payment/paymentApi';
+import { useSelector } from 'react-redux';
 
 const { Option } = Select;
 
@@ -20,6 +21,10 @@ const Payments = () => {
     const [selectedPayment, setSelectedPayment] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize] = useState(10);
+
+    // Get current user from Redux store
+    const { user: currentUser } = useSelector((state) => state.auth);
+    const isAnalyst = currentUser?.role === 'analyst';
 
     // RTK Query hooks
     const { 
@@ -78,6 +83,8 @@ const Payments = () => {
     };
 
     const showNewPaymentModal = () => {
+        if (isAnalyst) return; // Prevent analysts from adding
+        
         form.resetFields();
         setIsNewPaymentModalVisible(true);
     };
@@ -119,6 +126,8 @@ const Payments = () => {
     };
 
     const showEditPaymentModal = (payment) => {
+        if (isAnalyst) return; // Prevent analysts from editing
+        
         setSelectedPayment(payment);
         editForm.setFieldsValue({
             gateway: payment.gateway,
@@ -169,6 +178,8 @@ const Payments = () => {
     };
 
     const showDeleteModal = (payment) => {
+        if (isAnalyst) return; // Prevent analysts from deleting
+        
         setSelectedPayment(payment);
         setIsDeleteModalVisible(true);
     };
@@ -272,26 +283,33 @@ const Payments = () => {
             key: 'action',
             render: (text, record) => (
                 <div className="flex space-x-2">
-                    <button 
-                        className="border text-gray-800 px-2 py-1 rounded text-sm hover:bg-gray-100"
-                        onClick={() => showEditPaymentModal(record)}
-                        disabled={isUpdating}
-                    >
-                        Edit
-                    </button>
+                    {/* Always show View button */}
                     <button 
                         className="border text-gray-800 px-2 py-1 rounded text-sm hover:bg-gray-100"
                         onClick={() => showModal(record)}
                     >
                         View
                     </button>
-                    <button 
-                        className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
-                        onClick={() => showDeleteModal(record)}
-                        disabled={isDeleting}
-                    >
-                        Delete
-                    </button>
+                    
+                    {/* Show Edit and Delete buttons only for non-analysts */}
+                    {!isAnalyst && (
+                        <>
+                            <button 
+                                className="border text-gray-800 px-2 py-1 rounded text-sm hover:bg-gray-100"
+                                onClick={() => showEditPaymentModal(record)}
+                                disabled={isUpdating}
+                            >
+                                Edit
+                            </button>
+                            <button 
+                                className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
+                                onClick={() => showDeleteModal(record)}
+                                disabled={isDeleting}
+                            >
+                                Delete
+                            </button>
+                        </>
+                    )}
                 </div>
             ),
         },
@@ -315,17 +333,20 @@ const Payments = () => {
             <div className="flex flex-col md:flex-row justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Payments</h2>
                 <div className='flex gap-5'>
-                    <div>
-                        <Button
-                            type="primary"
-                            icon={<span className="text-white">+</span>}
-                            className="bg-gradient-to-r from-[#059E68] to-[#C9F31D] text-white rounded flex items-center"
-                            onClick={showNewPaymentModal}
-                            loading={isCreating}
-                        >
-                            Add New Payment
-                        </Button>
-                    </div>
+                    {/* Show Add button only for non-analysts */}
+                    {!isAnalyst && (
+                        <div>
+                            <Button
+                                type="primary"
+                                icon={<span className="text-white">+</span>}
+                                className="bg-gradient-to-r from-[#059E68] to-[#C9F31D] text-white rounded flex items-center"
+                                onClick={showNewPaymentModal}
+                                loading={isCreating}
+                            >
+                                Add New Payment
+                            </Button>
+                        </div>
+                    )}
                     <div>
                         <Dropdown overlay={menu} trigger={['click']}>
                             <Button className="bg-gray-200 hover:bg-gray-300 rounded flex items-center">
