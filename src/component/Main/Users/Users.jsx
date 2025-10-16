@@ -410,14 +410,14 @@ const Users = () => {
       key: 'name',
       render: (text, record) => (
         <div className="flex items-center">
-          <img 
-            src={record.avatar} 
-            alt={text} 
-            className="w-10 h-10 rounded-full mr-2 object-cover"
-            onError={(e) => {
-              e.target.src = '/user.jpg';
-            }}
-          />
+       <img 
+  src={`${import.meta.env.REACT_APP_BASE_URL || 'http://localhost:5000'}${record.avatar}`}
+  alt={text} 
+  className="w-10 h-10 rounded-full mr-2 object-cover"
+  onError={(e) => {
+    e.target.src = '/user.jpg';
+  }}
+/>
           <div>
             <div className="font-medium">{text}</div>
             <div className="text-xs text-gray-500">{record.designation || 'N/A'}</div>
